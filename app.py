@@ -18,7 +18,11 @@ app.secret_key = os.getenv("SECRET_KEY", "scll-secret-2024")
 
 BASE_DIR      = os.path.dirname(__file__)
 TEMPLATE_PATH = os.path.join(BASE_DIR, "email_template.html")
-DATA_PATH     = os.path.join(BASE_DIR, "data.json")   # issue counter + drafts + history + subscribers
+
+# DATA_DIR can be overridden via env var so Railway Volumes (or any mounted
+# persistent disk) keep data across redeploys.  Default = next to app.py.
+DATA_DIR  = os.getenv("DATA_DIR", BASE_DIR)
+DATA_PATH = os.path.join(DATA_DIR, "data.json")
 
 # ── Persistent data helpers ──────────────────────────────────────────────────
 
@@ -136,12 +140,24 @@ TRACKED_URL_FIELDS = {
 # ── Template / link helpers ──────────────────────────────────────────────────
 
 def make_tracking_url(original_url: str, issue_number: str, field_key: str) -> str:
-    """Wrap a URL in our click-tracking redirect."""
+    """Wrap a URL in our click-tracking redirect.
+    Uses APP_URL env var (set this to your Railway public URL) so links in
+    sent emails point to the right host — not localhost.
+    """
     if not original_url or original_url in ("#", "https://"):
         return original_url
     import urllib.parse
+    # APP_URL should be like https://your-app.up.railway.app (no trailing slash)
+    base = os.getenv("APP_URL", "").rstrip("/")
+    if not base:
+        # Fall back to the current request host when called inside a request context
+        try:
+            from flask import request as _req
+            base = _req.host_url.rstrip("/")
+        except RuntimeError:
+            base = "http://localhost:5050"
     params = urllib.parse.urlencode({"url": original_url, "issue": issue_number, "ref": field_key})
-    return f"http://localhost:5050/track?{params}"
+    return f"{base}/track?{params}"
 
 
 def fill_template(data: dict, track_links: bool = False) -> str:
@@ -425,14 +441,28 @@ def settings():
             val = request.form.get(var, "").strip()
             if val:
                 lines.append(f'{var}="{val}"')
-        with open(env_path, "w") as f:
-            f.write("\n".join(lines) + "\n")
-        load_dotenv(override=True)
-        flash("Settings saved!", "success")
+        # Try writing .env (works locally). On Railway the filesystem may be
+        # read-only for the project root — in that case silently skip the write
+        # and instruct the user to set vars in the Railway dashboard instead.
+        try:
+            os.makedirs(os.path.dirname(env_path), exist_ok=True)
+            with open(env_path, "w") as f:
+                f.write("\n".join(lines) + "\n")
+            load_dotenv(override=True)
+            flash("Settings saved to .env!", "success")
+        except OSError:
+            flash(
+                "Could not write .env (read-only filesystem). "
+                "Set these variables in your Railway dashboard under Variables instead.",
+                "warning",
+            )
         return redirect(url_for("settings"))
     current = {var: os.getenv(var, default) for var, _, __, default in env_vars}
     return render_template("settings.html", env_vars=env_vars, current=current)
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5050)
+    # Railway injects PORT; fall back to 5050 for local dev
+    port = int(os.getenv("PORT", 5050))
+    debug = os.getenv("FLASK_ENV", "development") != "production"
+    app.run(debug=debug, host="0.0.0.0", port=port)
