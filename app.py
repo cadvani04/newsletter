@@ -462,7 +462,6 @@ def settings():
 
 
 if __name__ == "__main__":
-    # Railway injects PORT; fall back to 5050 for local dev
     port = int(os.getenv("PORT", 5050))
-    debug = os.getenv("FLASK_ENV", "development") != "production"
-    app.run(debug=debug, host="0.0.0.0", port=port)
+    # Never use the reloader — it spawns a child process Railway can't route to
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
