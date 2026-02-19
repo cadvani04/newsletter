@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics — Santa Cruz Local Legends</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@0,400;0,500;0,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --black: #0a0a09; --off-black: #111110; --card: #161614;
+      --border: #242420; --gold: #E8A020; --white: #f5f0e8; --muted: #6a6a60;
+    }
+    body { background: var(--black); color: var(--white);
+      font-family: 'DM Sans', sans-serif; font-size: 15px;
+      -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+    .topbar { background: var(--off-black); border-bottom: 1px solid var(--border);
+      height: 56px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; }
+    .wordmark { font-family: 'Bebas Neue', sans-serif; font-size: 19px; letter-spacing: 2px; }
+    .wordmark span { color: var(--gold); }
+    .back-link { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); text-decoration: none; border: 1px solid var(--border);
+      padding: 7px 14px; border-radius: 6px; transition: color .15s; }
+    .back-link:hover { color: var(--white); }
+
+    .page { max-width: 800px; margin: 0 auto; padding: 40px 20px 80px; }
+    .page-title { font-family: 'Bebas Neue', sans-serif; font-size: 36px;
+      letter-spacing: 2px; margin-bottom: 28px; }
+
+    /* stat cards */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 20px; }
+    .stat-label { font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 42px;
+      color: var(--gold); line-height: 1; }
+
+    .card { background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 24px; margin-bottom: 16px; }
+    .card-title { font-size: 10px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--gold); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px; }
+    .card-title::before { content: ''; display: block; width: 14px; height: 1px; background: var(--gold); }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); text-align: left; padding: 0 0 12px; border-bottom: 1px solid var(--border); }
+    td { padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .url-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: var(--muted); font-size: 12px; }
+    .issue-badge { display: inline-block; background: var(--gold-dim, rgba(232,160,32,0.12));
+      border: 1px solid rgba(232,160,32,0.25); color: var(--gold); font-size: 11px;
+      font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+
+    .empty-state { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
+
+    .section-divider { font-size: 10px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--muted); padding: 12px 0 8px;
+      border-top: 1px solid var(--border); margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wordmark">Santa Cruz <span>Local Legends</span></div>
+  <a href="/" class="back-link">← Back to Editor</a>
+</div>
+
+<div class="page">
+  <h1 class="page-title">Analytics</h1>
+
+  <!-- Summary stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Issues Sent</div>
+      <div class="stat-value">{{ send_history|length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Link Clicks</div>
+      <div class="stat-value">{{ total_clicks }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Issues Tracked</div>
+      <div class="stat-value">{{ by_issue|length }}</div>
+    </div>
+  </div>
+
+  <!-- Send history -->
+  <div class="card">
+    <div class="card-title">Send History</div>
+    {% if send_history %}
+    <table>
+      <thead>
+        <tr>
+          <th>Issue</th>
+          <th>Subject</th>
+          <th>Recipients</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in send_history %}
+        <tr>
+          <td><span class="issue-badge">#{{ h.issue }}</span></td>
+          <td class="muted">{{ h.subject }}</td>
+          <td>{{ h.recipients }}</td>
+          <td class="muted">{{ h.date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">No emails sent yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Link clicks by issue -->
+  <div class="card">
+    <div class="card-title">Link Clicks by Issue</div>
+    {% if by_issue %}
+      {% for issue_num, clicks in by_issue.items()|sort %}
+      <div class="section-divider">Issue #{{ issue_num }} — {{ clicks|length }} click{{ 's' if clicks|length != 1 }}</div>
+      <table style="margin-bottom:8px;">
+        <thead>
+          <tr>
+            <th>Link</th>
+            <th>Destination</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clicks %}
+          <tr>
+            <td style="color:var(--white);">{{ c.ref.replace('_', ' ').title() }}</td>
+            <td class="url-cell"><a href="{{ c.url }}" target="_blank" style="color:var(--muted);text-decoration:none;">{{ c.url }}</a></td>
+            <td class="muted" style="font-size:12px;">{{ c.time[:16].replace('T', ' ') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+    {% else %}
+    <div class="empty-state">No link clicks tracked yet. They appear here after subscribers click links in sent emails.</div>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>

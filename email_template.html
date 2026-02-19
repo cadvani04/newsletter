@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Santa Cruz Local Legends</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:   #0a0a09;
+      --off-black: #111110;
+      --card:    #161614;
+      --border:  #242420;
+      --gold:    #E8A020;
+      --gold-dim: rgba(232,160,32,0.15);
+      --white:   #f5f0e8;
+      --muted:   #6a6a60;
+      --body-bg: #0a0a09;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--body-bg);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .email-wrap {
+      max-width: 620px;
+      margin: 0 auto;
+      padding: 0;
+    }
+
+    .header {
+      background: var(--off-black);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-wordmark {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 2px;
+      color: var(--white);
+      line-height: 1;
+    }
+    .header-wordmark span { color: var(--gold); }
+    .header-meta {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-align: right;
+      line-height: 1.5;
+    }
+
+    .issue-banner {
+      background: var(--gold);
+      padding: 13px 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .issue-banner-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--black);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .issue-banner p {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--black);
+      font-style: italic;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 14px;
+    }
+    .section-label::before {
+      content: '';
+      display: block;
+      width: 20px;
+      height: 1px;
+      background: var(--gold);
+    }
+
+    .biz-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      margin: 10px 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .biz-photo {
+      width: 100%;
+      height: 300px;
+      object-fit: cover;
+      display: block;
+      background: var(--border);
+    }
+
+    .photo-placeholder {
+      width: 100%;
+      height: 300px;
+      background: linear-gradient(135deg, #1a1a18 0%, #242420 50%, #1a1a18 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--muted);
+    }
+    .photo-placeholder-icon {
+      font-size: 32px;
+      opacity: 0.4;
+    }
+    .photo-placeholder-text {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.5;
+    }
+
+    .biz-type-badge {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: var(--gold);
+      color: var(--black);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 5px 12px;
+    }
+
+    .biz-body {
+      padding: 24px 26px 22px;
+    }
+
+    .biz-neighborhood {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .biz-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 30px;
+      font-weight: 400;
+      color: var(--white);
+      line-height: 1.05;
+      margin-bottom: 14px;
+      letter-spacing: -0.3px;
+    }
+
+    .biz-description {
+      font-size: 15px;
+      line-height: 1.75;
+      color: #b8b4aa;
+      margin-bottom: 20px;
+    }
+
+    .order-this {
+      background: var(--gold-dim);
+      border: 1px solid rgba(232,160,32,0.3);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .order-this-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold);
+      white-space: nowrap;
+      padding-top: 2px;
+      flex-shrink: 0;
+    }
+    .order-this-item {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--white);
+      line-height: 1.4;
+    }
+
+    .biz-details {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      gap: 12px;
+    }
+    .biz-info { flex: 1; }
+    .biz-address {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--white);
+      margin-bottom: 3px;
+    }
+    .biz-hours-price {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .biz-cta {
+      display: inline-block;
+      background: var(--gold);
+      color: var(--black);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 11px 20px;
+      border-radius: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .trends-block {
+      background: var(--card);
+      border: 1px solid var(--border);
+      margin: 10px 0;
+      padding: 28px 26px;
+    }
+    .trends-headline {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      color: var(--white);
+      margin-bottom: 24px;
+      line-height: 1.2;
+    }
+    .trend-item {
+      display: flex;
+      gap: 16px;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .trend-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .trend-number {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 38px;
+      color: var(--gold);
+      opacity: 0.25;
+      line-height: 1;
+      flex-shrink: 0;
+      width: 44px;
+    }
+    .trend-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: 5px;
+      line-height: 1.3;
+    }
+    .trend-body {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .cta-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      margin: 10px 0;
+      padding: 26px;
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      gap: 0;
+    }
+    .cta-divider {
+      background: var(--border);
+      width: 1px;
+    }
+    .cta-item { padding: 0 24px; }
+    .cta-item:first-child { padding-left: 0; }
+    .cta-item:last-child  { padding-right: 0; }
+    .cta-eyebrow {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+    .cta-text {
+      font-size: 14px;
+      color: #b8b4aa;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+    .cta-link {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gold);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(232,160,32,0.4);
+      padding-bottom: 2px;
+    }
+
+    .footer {
+      background: var(--off-black);
+      border-top: 1px solid var(--border);
+      padding: 24px 28px;
+      text-align: center;
+    }
+    .footer-wordmark {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      letter-spacing: 4px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .footer-text {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 10px;
+    }
+    .footer-links a {
+      font-size: 11px;
+      color: #444440;
+      text-decoration: underline;
+      margin: 0 6px;
+    }
+
+    .gold-line {
+      height: 3px;
+      background: var(--gold);
+      width: 100%;
+    }
+
+    @media (max-width: 640px) {
+      .header { padding: 16px 18px; }
+      .issue-banner { padding: 12px 18px; }
+      .biz-body { padding: 20px 18px 18px; }
+      .trends-block { padding: 22px 18px; }
+      .biz-name { font-size: 26px; }
+      .biz-photo, .photo-placeholder { height: 220px; }
+      .cta-bar { grid-template-columns: 1fr; gap: 20px; }
+      .cta-divider { display: none; }
+      .cta-item { padding: 0; }
+      .cta-item + .cta-item { padding-top: 20px; border-top: 1px solid var(--border); }
+      .biz-details { flex-direction: column; align-items: flex-start; }
+      .biz-cta { width: 100%; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="email-wrap">
+
+  <div class="gold-line"></div>
+
+  <div class="header">
+    <div class="header-wordmark">
+      Santa Cruz <span>Local Legends</span>
+    </div>
+    <div class="header-meta">
+      Issue #{{ISSUE_NUMBER}}<br>
+      {{ISSUE_DATE}}
+    </div>
+  </div>
+
+  <div class="issue-banner">
+    <div class="issue-banner-dot"></div>
+    <p>{{ISSUE_INTRO_LINE}}</p>
+  </div>
+
+  <!-- BUSINESS 1 -->
+  <div class="biz-card">
+    <div style="position:relative;">
+      <img
+        src="{{BIZ_1_PHOTO}}"
+        alt="{{BIZ_1_NAME}}"
+        class="biz-photo"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+      >
+      <div class="photo-placeholder" style="display:none;">
+        <div class="photo-placeholder-icon">📷</div>
+        <div class="photo-placeholder-text">Add your photo here — 600×300px</div>
+      </div>
+      <div class="biz-type-badge">{{BIZ_1_TYPE}}</div>
+    </div>
+    <div class="biz-body">
+      <div class="biz-neighborhood">{{BIZ_1_NEIGHBORHOOD}}</div>
+      <h2 class="biz-name">{{BIZ_1_NAME}}</h2>
+      <p class="biz-description">{{BIZ_1_DESCRIPTION}}</p>
+      <div class="order-this">
+        <div class="order-this-label">Order This</div>
+        <div class="order-this-item">{{BIZ_1_ORDER_THIS}}</div>
+      </div>
+      <div class="biz-details">
+        <div class="biz-info">
+          <div class="biz-address">{{BIZ_1_ADDRESS}}</div>
+          <div class="biz-hours-price">{{BIZ_1_HOURS}} &nbsp;·&nbsp; {{BIZ_1_PRICE}}</div>
+        </div>
+        <a href="{{BIZ_1_WEBSITE}}" class="biz-cta">Visit →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUSINESS 2 -->
+  <div class="biz-card">
+    <div style="position:relative;">
+      <img
+        src="{{BIZ_2_PHOTO}}"
+        alt="{{BIZ_2_NAME}}"
+        class="biz-photo"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+      >
+      <div class="photo-placeholder" style="display:none;">
+        <div class="photo-placeholder-icon">📷</div>
+        <div class="photo-placeholder-text">Add your photo here — 600×300px</div>
+      </div>
+      <div class="biz-type-badge">{{BIZ_2_TYPE}}</div>
+    </div>
+    <div class="biz-body">
+      <div class="biz-neighborhood">{{BIZ_2_NEIGHBORHOOD}}</div>
+      <h2 class="biz-name">{{BIZ_2_NAME}}</h2>
+      <p class="biz-description">{{BIZ_2_DESCRIPTION}}</p>
+      <div class="order-this">
+        <div class="order-this-label">Order This</div>
+        <div class="order-this-item">{{BIZ_2_ORDER_THIS}}</div>
+      </div>
+      <div class="biz-details">
+        <div class="biz-info">
+          <div class="biz-address">{{BIZ_2_ADDRESS}}</div>
+          <div class="biz-hours-price">{{BIZ_2_HOURS}} &nbsp;·&nbsp; {{BIZ_2_PRICE}}</div>
+        </div>
+        <a href="{{BIZ_2_WEBSITE}}" class="biz-cta">Visit →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUSINESS 3 -->
+  <div class="biz-card">
+    <div style="position:relative;">
+      <img
+        src="{{BIZ_3_PHOTO}}"
+        alt="{{BIZ_3_NAME}}"
+        class="biz-photo"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+      >
+      <div class="photo-placeholder" style="display:none;">
+        <div class="photo-placeholder-icon">📷</div>
+        <div class="photo-placeholder-text">Add your photo here — 600×300px</div>
+      </div>
+      <div class="biz-type-badge">{{BIZ_3_TYPE}}</div>
+    </div>
+    <div class="biz-body">
+      <div class="biz-neighborhood">{{BIZ_3_NEIGHBORHOOD}}</div>
+      <h2 class="biz-name">{{BIZ_3_NAME}}</h2>
+      <p class="biz-description">{{BIZ_3_DESCRIPTION}}</p>
+      <div class="order-this">
+        <div class="order-this-label">Order This</div>
+        <div class="order-this-item">{{BIZ_3_ORDER_THIS}}</div>
+      </div>
+      <div class="biz-details">
+        <div class="biz-info">
+          <div class="biz-address">{{BIZ_3_ADDRESS}}</div>
+          <div class="biz-hours-price">{{BIZ_3_HOURS}} &nbsp;·&nbsp; {{BIZ_3_PRICE}}</div>
+        </div>
+        <a href="{{BIZ_3_WEBSITE}}" class="biz-cta">Visit →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHAT WE'RE SEEING -->
+  <div class="trends-block">
+    <div class="section-label">What We're Seeing</div>
+    <h3 class="trends-headline">Patterns Across the Santa Cruz Scene This Week</h3>
+
+    <div class="trend-item">
+      <div class="trend-number">01</div>
+      <div class="trend-content">
+        <div class="trend-title">{{OBSERVATION_1_HEADLINE}}</div>
+        <div class="trend-body">{{OBSERVATION_1}}</div>
+      </div>
+    </div>
+
+    <div class="trend-item">
+      <div class="trend-number">02</div>
+      <div class="trend-content">
+        <div class="trend-title">{{OBSERVATION_2_HEADLINE}}</div>
+        <div class="trend-body">{{OBSERVATION_2}}</div>
+      </div>
+    </div>
+
+    <div class="trend-item">
+      <div class="trend-number">03</div>
+      <div class="trend-content">
+        <div class="trend-title">{{OBSERVATION_3_HEADLINE}}</div>
+        <div class="trend-body">{{OBSERVATION_3}}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPLY + FORWARD -->
+  <div class="cta-bar">
+    <div class="cta-item">
+      <div class="cta-eyebrow">Know a hidden gem?</div>
+      <p class="cta-text">Tell us the name. We'll find the story.</p>
+      <a href="mailto:{{REPLY_EMAIL}}?subject=Hidden%20Gem%20Tip" class="cta-link">Reply →</a>
+    </div>
+    <div class="cta-divider"></div>
+    <div class="cta-item">
+      <div class="cta-eyebrow">Found something good?</div>
+      <p class="cta-text">Send this to someone who loves Santa Cruz.</p>
+      <a href="{{FORWARD_URL}}" class="cta-link">Forward this issue →</a>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-wordmark">Santa Cruz Local Legends</div>
+    <p class="footer-text">
+      You're receiving this because you signed up at {{SIGNUP_URL}}<br>
+      {{COMPANY_ADDRESS}} · Santa Cruz, CA
+    </p>
+    <div class="footer-links">
+      <a href="{{PREFERENCES_URL}}">Manage preferences</a>
+      <a href="{{UNSUBSCRIBE_URL}}">Unsubscribe</a>
+    </div>
+  </div>
+
+  <div class="gold-line"></div>
+
+</div>
+
+</body>
+</html>

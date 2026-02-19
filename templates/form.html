@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Santa Cruz Local Legends — Compose</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --black:     #0a0a09;
+      --off-black: #111110;
+      --card:      #161614;
+      --border:    #242420;
+      --gold:      #E8A020;
+      --gold-dim:  rgba(232,160,32,0.12);
+      --white:     #f5f0e8;
+      --muted:     #6a6a60;
+      --green:     #4caf79;
+      --red:       #e05252;
+    }
+    html, body { height: 100%; background: var(--black); color: var(--white);
+      font-family: 'DM Sans', sans-serif; font-size: 15px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased; }
+
+    /* ── SHELL ── */
+    .app-shell {
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      grid-template-rows: 56px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      grid-column: 1 / -1;
+      background: var(--off-black);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      gap: 12px;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 18px; }
+    .wordmark { font-family: 'Bebas Neue', sans-serif; font-size: 19px;
+      letter-spacing: 2px; color: var(--white); white-space: nowrap; }
+    .wordmark span { color: var(--gold); }
+
+    .stat-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--muted);
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px;
+    }
+    .stat-pill strong { color: var(--white); }
+
+    .topbar-nav { display: flex; align-items: center; gap: 6px; }
+    .nav-link {
+      font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--muted);
+      text-decoration: none; padding: 7px 13px; border-radius: 6px;
+      border: 1px solid transparent; transition: all .15s;
+    }
+    .nav-link:hover { color: var(--white); border-color: var(--border); }
+
+    /* ── LEFT PANEL ── */
+    .form-panel {
+      background: var(--off-black);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding-bottom: 60px;
+    }
+    .form-panel::-webkit-scrollbar { width: 5px; }
+    .form-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── RIGHT PANEL ── */
+    .preview-panel {
+      display: flex; flex-direction: column; overflow: hidden;
+      background: var(--black);
+    }
+    .preview-header {
+      padding: 12px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .preview-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .preview-frame { flex: 1; border: none; width: 100%; background: var(--black); }
+
+    /* ── SECTION HEADERS ── */
+    .section-header {
+      padding: 14px 20px 11px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer; user-select: none;
+    }
+    .section-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+    .section-title { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); flex: 1; }
+    .section-chevron { font-size: 11px; color: var(--muted); transition: transform .2s; }
+    .section-collapsed .section-chevron { transform: rotate(-90deg); }
+    .section-body { padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 13px; }
+    .section-collapsed .section-body { display: none; }
+
+    /* ── FORM FIELDS ── */
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+    input[type="text"], input[type="email"], input[type="url"],
+    input[type="number"], input[type="password"], textarea {
+      background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 14px;
+      padding: 9px 12px; width: 100%; outline: none; transition: border-color .15s;
+    }
+    input:focus, textarea:focus { border-color: rgba(232,160,32,0.5); }
+    textarea { resize: vertical; min-height: 78px; }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
+
+    /* ── SEND AREA ── */
+    .send-area { padding: 18px 20px; display: flex; flex-direction: column; gap: 13px; }
+    .send-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--gold); display: flex; align-items: center; gap: 8px;
+    }
+    .send-title::before { content: ''; display: block; width: 16px; height: 1px; background: var(--gold); }
+
+    /* toggle: list vs custom */
+    .recipient-toggle { display: flex; gap: 0; background: var(--card); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .recipient-toggle label {
+      flex: 1; text-align: center; padding: 9px 0; cursor: pointer;
+      font-size: 11px; letter-spacing: 1px; color: var(--muted);
+      transition: all .15s; border-radius: 0; text-transform: uppercase;
+    }
+    .recipient-toggle input[type="radio"] { display: none; }
+    .recipient-toggle input[type="radio"]:checked + label {
+      background: var(--gold-dim); color: var(--gold);
+      border-color: transparent;
+    }
+
+    .send-btn {
+      background: var(--gold); color: var(--black); font-family: 'DM Sans', sans-serif;
+      font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      border: none; border-radius: 6px; padding: 13px 20px;
+      cursor: pointer; width: 100%; transition: opacity .15s;
+    }
+    .send-btn:hover { opacity: .85; }
+    .send-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .new-issue-btn {
+      background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif;
+      font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
+      border: 1px solid var(--border); border-radius: 6px; padding: 10px 20px;
+      cursor: pointer; width: 100%; transition: all .15s;
+    }
+    .new-issue-btn:hover { color: var(--white); border-color: var(--muted); }
+
+    /* ── HISTORY STRIP ── */
+    .history-strip { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+    .history-label { font-size: 10px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .history-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid var(--border); gap: 8px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-issue { font-size: 12px; font-weight: 600; color: var(--white); }
+    .history-meta { font-size: 11px; color: var(--muted); text-align: right; }
+
+    /* ── AUTOSAVE BADGE ── */
+    #autosave-badge {
+      font-size: 10px; color: var(--muted); letter-spacing: 1px;
+      transition: color .3s;
+    }
+    #autosave-badge.saved { color: var(--green); }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 13px 18px; font-size: 13px; color: var(--white); max-width: 340px;
+      opacity: 0; transform: translateY(6px);
+      transition: opacity .25s, transform .25s; pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    #toast.success { border-color: rgba(76,175,121,0.4); }
+    #toast.error   { border-color: rgba(224,82,82,0.4); }
+
+    .spinner { display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(10,10,9,0.3); border-top-color: var(--black);
+      border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ── TOP BAR ── -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="wordmark">Santa Cruz <span>Local Legends</span></div>
+      <div class="stat-pill">Issue <strong>#{{ issue_counter }}</strong></div>
+      <div class="stat-pill"><strong>{{ subscriber_count }}</strong>&nbsp;subscribers</div>
+      <span id="autosave-badge">● draft saved</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/subscribers" class="nav-link">Subscribers</a>
+      <a href="/analytics"   class="nav-link">Analytics</a>
+      <a href="/settings"    class="nav-link">Settings</a>
+      <button class="nav-link" style="border:none;cursor:pointer;background:none;" onclick="refreshPreview()">↺ Preview</button>
+    </nav>
+  </header>
+
+  <!-- ── FORM PANEL ── -->
+  <aside class="form-panel">
+    <form id="issueForm">
+
+      {% for section_key, section in sections.items() %}
+      <div class="form-section" id="section-{{ section_key }}">
+        <div class="section-header" onclick="toggleSection('{{ section_key }}')">
+          <div class="section-dot"></div>
+          <div class="section-title">{{ section.label }}</div>
+          <div class="section-chevron">▾</div>
+        </div>
+        <div class="section-body">
+          {% for key, label, type, default in section.fields %}
+          <div class="field-group">
+            <label for="{{ key }}">{{ label }}</label>
+            {% if type == "textarea" %}
+            <textarea id="{{ key }}" name="{{ key }}" placeholder="{{ label }}" rows="3">{{ draft.get(key, default) }}</textarea>
+            {% else %}
+            <input type="{{ type }}" id="{{ key }}" name="{{ key }}"
+                   placeholder="{{ label }}" value="{{ draft.get(key, default) }}">
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <!-- ── SEND ── -->
+      <div class="send-area">
+        <div class="send-title">Send Issue</div>
+
+        <div class="field-group">
+          <label for="email_subject">Subject Line</label>
+          <input type="text" id="email_subject" name="email_subject"
+                 placeholder="Santa Cruz Local Legends — Issue #{{ issue_counter }}">
+        </div>
+
+        <!-- Send to: subscriber list OR custom -->
+        <div class="field-group">
+          <label>Send To</label>
+          <div class="recipient-toggle">
+            <input type="radio" name="send_to" id="to_list" value="list" checked>
+            <label for="to_list">My {{ subscriber_count }} subscribers</label>
+            <input type="radio" name="send_to" id="to_custom" value="custom">
+            <label for="to_custom">Custom emails</label>
+          </div>
+        </div>
+
+        <div class="field-group" id="custom-recipients-group" style="display:none;">
+          <label for="recipients">Recipient Emails (comma or line-separated)</label>
+          <textarea id="recipients" name="recipients" placeholder="hello@example.com&#10;friend@example.com" rows="3"></textarea>
+        </div>
+
+        <button type="button" class="send-btn" onclick="sendEmail()">
+          <span id="sendLabel">✉ Send to {% if subscriber_count > 0 %}{{ subscriber_count }} subscriber{{ 's' if subscriber_count != 1 }}{% else %}Custom List{% endif %}</span>
+        </button>
+
+        <button type="button" class="new-issue-btn" onclick="newIssue()">
+          + Start New Issue (will advance to #{{ issue_counter + 1 }})
+        </button>
+      </div>
+
+      <!-- ── HISTORY ── -->
+      {% if send_history %}
+      <div class="history-strip">
+        <div class="history-label">Recent Sends</div>
+        {% for h in send_history %}
+        <div class="history-item">
+          <div class="history-issue">Issue #{{ h.issue }}</div>
+          <div class="history-meta">{{ h.recipients }} recipients<br>{{ h.date }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </form>
+  </aside>
+
+  <!-- ── PREVIEW PANEL ── -->
+  <main class="preview-panel">
+    <div class="preview-header">
+      <span class="preview-label">Live Preview</span>
+      <span class="preview-label" style="color:rgba(232,160,32,0.45);">Auto-updates as you type</span>
+    </div>
+    <iframe id="previewFrame" class="preview-frame"
+      srcdoc="<div style='color:#6a6a60;font-family:sans-serif;padding:60px;text-align:center;font-size:14px;'>Rendering preview…</div>">
+    </iframe>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // ── Section toggle ──────────────────────────────────────────────────────────
+  function toggleSection(key) {
+    document.getElementById("section-" + key).classList.toggle("section-collapsed");
+  }
+
+  // ── Recipient toggle ────────────────────────────────────────────────────────
+  document.querySelectorAll('input[name="send_to"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      document.getElementById("custom-recipients-group").style.display =
+        radio.value === "custom" && radio.checked ? "flex" : "none";
+    });
+  });
+
+  // ── Auto-save draft (debounced 1.5s) ───────────────────────────────────────
+  let saveTimer = null;
+  const badge = document.getElementById("autosave-badge");
+  document.getElementById("issueForm").addEventListener("input", () => {
+    badge.textContent = "● saving…";
+    badge.className = "";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 1500);
+    // also trigger preview
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(refreshPreview, 600);
+  });
+
+  async function saveDraft() {
+    const fd = new FormData(document.getElementById("issueForm"));
+    await fetch("/draft/save", { method: "POST", body: fd });
+    badge.textContent = "● draft saved";
+    badge.className = "saved";
+    setTimeout(() => badge.className = "", 2000);
+  }
+
+  // ── Preview ─────────────────────────────────────────────────────────────────
+  let previewTimer = null;
+  async function refreshPreview() {
+    const fd = new FormData(document.getElementById("issueForm"));
+    const res = await fetch("/preview", { method: "POST", body: fd });
+    if (res.ok) document.getElementById("previewFrame").srcdoc = await res.text();
+  }
+
+  // ── Send ────────────────────────────────────────────────────────────────────
+  async function sendEmail() {
+    const btn   = document.querySelector(".send-btn");
+    const label = document.getElementById("sendLabel");
+    btn.disabled = true;
+    label.innerHTML = '<span class="spinner"></span>&nbsp; Sending…';
+
+    const fd = new FormData(document.getElementById("issueForm"));
+    try {
+      const res  = await fetch("/send", { method: "POST", body: fd });
+      const data = await res.json();
+      showToast(data.ok ? "success" : "error", data.message);
+      if (data.ok) setTimeout(() => location.reload(), 1800);
+    } catch (e) {
+      showToast("error", "Network error — is the server running?");
+    } finally {
+      btn.disabled = false;
+      label.textContent = "✉ Send";
+    }
+  }
+
+  // ── New issue ───────────────────────────────────────────────────────────────
+  async function newIssue() {
+    if (!confirm("Mark current issue as done and start a fresh one?")) return;
+    const res  = await fetch("/draft/clear", { method: "POST" });
+    const data = await res.json();
+    if (data.ok) location.reload();
+  }
+
+  // ── Toast ───────────────────────────────────────────────────────────────────
+  let toastTimer = null;
+  function showToast(type, message) {
+    const el = document.getElementById("toast");
+    el.className = `show ${type}`;
+    el.innerHTML = (type === "success" ? "✓ " : "✕ ") + message;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.className = "", 5000);
+  }
+
+  // ── On load ─────────────────────────────────────────────────────────────────
+  window.addEventListener("DOMContentLoaded", refreshPreview);
+</script>
+</body>
+</html>

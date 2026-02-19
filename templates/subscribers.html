@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subscribers — Santa Cruz Local Legends</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@0,300;0,400;0,500;0,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --black: #0a0a09; --off-black: #111110; --card: #161614;
+      --border: #242420; --gold: #E8A020; --white: #f5f0e8;
+      --muted: #6a6a60; --green: #4caf79; --red: #e05252; --orange: #e08020;
+    }
+    body { background: var(--black); color: var(--white);
+      font-family: 'DM Sans', sans-serif; font-size: 15px;
+      -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+    .topbar { background: var(--off-black); border-bottom: 1px solid var(--border);
+      height: 56px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; }
+    .wordmark { font-family: 'Bebas Neue', sans-serif; font-size: 19px; letter-spacing: 2px; }
+    .wordmark span { color: var(--gold); }
+    .back-link { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); text-decoration: none; border: 1px solid var(--border);
+      padding: 7px 14px; border-radius: 6px; transition: color .15s; }
+    .back-link:hover { color: var(--white); }
+
+    .page { max-width: 700px; margin: 0 auto; padding: 40px 20px 80px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between;
+      margin-bottom: 28px; gap: 12px; flex-wrap: wrap; }
+    .page-title { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 2px; }
+    .page-count { font-size: 13px; color: var(--muted); }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 24px; margin-bottom: 16px; }
+    .card-title { font-size: 10px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--gold); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px; }
+    .card-title::before { content: ''; display: block; width: 14px; height: 1px; background: var(--gold); }
+
+    .inline-form { display: flex; gap: 10px; flex-wrap: wrap; }
+    .inline-form input { background: var(--off-black); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--white); font-family: 'DM Sans', sans-serif;
+      font-size: 14px; padding: 9px 12px; outline: none; transition: border-color .15s; flex: 1; min-width: 180px; }
+    .inline-form input:focus { border-color: rgba(232,160,32,0.5); }
+    .inline-form input::placeholder { color: var(--muted); }
+    .btn { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase; border: none; border-radius: 6px;
+      padding: 9px 18px; cursor: pointer; white-space: nowrap; transition: opacity .15s; text-decoration: none; display: inline-block; }
+    .btn:hover { opacity: .85; }
+    .btn-gold { background: var(--gold); color: var(--black); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-outline:hover { color: var(--white); }
+    .btn-red { background: rgba(224,82,82,0.15); border: 1px solid rgba(224,82,82,0.3); color: var(--red); }
+
+    .import-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .import-row input[type="file"] { font-size: 13px; color: var(--muted); flex: 1; }
+
+    /* subscriber table */
+    .sub-table { width: 100%; border-collapse: collapse; }
+    .sub-table th { font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--muted); text-align: left;
+      padding: 0 0 12px; border-bottom: 1px solid var(--border); }
+    .sub-table td { padding: 12px 0; border-bottom: 1px solid var(--border);
+      font-size: 14px; vertical-align: middle; }
+    .sub-table tr:last-child td { border-bottom: none; }
+    .sub-email { color: var(--white); }
+    .sub-name { color: var(--muted); font-size: 13px; }
+    .sub-date { color: var(--muted); font-size: 12px; text-align: right; }
+    .sub-actions { text-align: right; }
+
+    .flash { border-radius: 8px; padding: 11px 16px; font-size: 13px; margin-bottom: 16px; }
+    .flash-success { background: rgba(76,175,121,0.1); border: 1px solid rgba(76,175,121,0.35); color: var(--green); }
+    .flash-warning { background: rgba(232,160,32,0.1); border: 1px solid rgba(232,160,32,0.35); color: var(--gold); }
+    .flash-error   { background: rgba(224,82,82,0.1);  border: 1px solid rgba(224,82,82,0.35);  color: var(--red); }
+
+    .empty-state { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
+    .export-row { display: flex; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wordmark">Santa Cruz <span>Local Legends</span></div>
+  <a href="/" class="back-link">← Back to Editor</a>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">Subscribers</h1>
+    <div class="page-count">{{ subscribers|length }} total</div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Add single subscriber -->
+  <div class="card">
+    <div class="card-title">Add Subscriber</div>
+    <form method="POST" action="/subscribers/add">
+      <div class="inline-form">
+        <input type="email" name="email" placeholder="Email address" required>
+        <input type="text"  name="name"  placeholder="Name (optional)">
+        <button type="submit" class="btn btn-gold">Add</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Import CSV -->
+  <div class="card">
+    <div class="card-title">Import CSV</div>
+    <form method="POST" action="/subscribers/import" enctype="multipart/form-data">
+      <div class="import-row">
+        <input type="file" name="csv_file" accept=".csv">
+        <button type="submit" class="btn btn-outline">Import</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">
+        CSV should have an <code>email</code> column (and optionally a <code>name</code> column). First row = headers.
+      </p>
+    </form>
+  </div>
+
+  <!-- List -->
+  <div class="card">
+    <div class="card-title">All Subscribers</div>
+    {% if subscribers %}
+    <div class="export-row" style="margin-bottom:16px;">
+      <a href="/subscribers/export" class="btn btn-outline">↓ Export CSV</a>
+    </div>
+    <table class="sub-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th style="text-align:right;">Added</th>
+          <th style="text-align:right;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in subscribers %}
+        <tr>
+          <td class="sub-email">{{ s.email }}</td>
+          <td class="sub-name">{{ s.name or '—' }}</td>
+          <td class="sub-date">{{ s.added }}</td>
+          <td class="sub-actions">
+            <form method="POST" action="/subscribers/remove/{{ s.email }}"
+                  onsubmit="return confirm('Remove {{ s.email }}?')">
+              <button type="submit" class="btn btn-red" style="font-size:10px;padding:5px 12px;">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">No subscribers yet. Add one above or import a CSV.</div>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>
