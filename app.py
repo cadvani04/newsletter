@@ -204,7 +204,8 @@ def send_email(html_body: str, subject: str, recipients: list) -> tuple:
         return False, f"Send failed: {str(e)}"
 
 def today() -> str:
-    return datetime.now().strftime("%B %-d, %Y")
+    now = datetime.now()
+    return f"{now.strftime('%B')} {now.day}, {now.year}"
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -278,7 +279,7 @@ async def send(request: Request):
     if ok:
         db["send_history"].append({
             "issue":      data.get("ISSUE_NUMBER", "?"),
-            "date":       datetime.now().strftime("%b %-d, %Y at %-I:%M %p"),
+            "date":       datetime.now().strftime("%b") + f" {datetime.now().day}, {datetime.now().year} at " + datetime.now().strftime("%I:%M %p").lstrip("0"),
             "subject":    subject,
             "recipients": len(recipients),
         })
