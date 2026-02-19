@@ -4,61 +4,78 @@ import json
 import csv
 import io
 import smtplib
+import uvicorn
+import urllib.parse
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from flask import (Flask, render_template, request, jsonify,
-                   redirect, url_for, flash, Response)
+
+from fastapi import FastAPI, Request, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "scll-secret-2024")
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "scll-secret-2024"))
+templates = Jinja2Templates(directory="templates")
 
-BASE_DIR      = os.path.dirname(__file__)
+BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = os.path.join(BASE_DIR, "email_template.html")
+DATA_DIR      = os.getenv("DATA_DIR", BASE_DIR)
+DATA_PATH     = os.path.join(DATA_DIR, "data.json")
 
-# DATA_DIR can be overridden via env var so Railway Volumes (or any mounted
-# persistent disk) keep data across redeploys.  Default = next to app.py.
-DATA_DIR  = os.getenv("DATA_DIR", BASE_DIR)
-DATA_PATH = os.path.join(DATA_DIR, "data.json")
 
-# ── Persistent data helpers ──────────────────────────────────────────────────
+# ── Flash helpers ─────────────────────────────────────────────────────────────
+
+def flash(request: Request, message: str, category: str = "success"):
+    request.session["_flash"] = {"message": message, "category": category}
+
+def get_flash(request: Request):
+    return request.session.pop("_flash", None)
+
+def render(request: Request, template: str, context: dict = {}):
+    return templates.TemplateResponse(
+        template, {"request": request, "flash": get_flash(request), **context}
+    )
+
+
+# ── Persistent data ───────────────────────────────────────────────────────────
 
 def load_data() -> dict:
-    """Load the entire data.json file, creating it with defaults if missing."""
     defaults = {
         "issue_counter": 1,
         "draft": {},
-        "subscribers": [],      # list of {"email": ..., "name": ..., "added": ...}
-        "send_history": []       # list of {"issue": N, "date": ..., "subject": ..., "recipients": N}
+        "subscribers": [],
+        "send_history": [],
+        "click_log": [],
     }
     if not os.path.exists(DATA_PATH):
         save_data(defaults)
         return defaults
     with open(DATA_PATH, "r", encoding="utf-8") as f:
         stored = json.load(f)
-    # merge in any missing keys
     for k, v in defaults.items():
         stored.setdefault(k, v)
     return stored
 
-
 def save_data(data: dict):
+    os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
     with open(DATA_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-# ── Template fields definition ───────────────────────────────────────────────
+# ── Template fields ───────────────────────────────────────────────────────────
 
 TEMPLATE_FIELDS = {
     "issue": {
         "label": "Issue Info",
         "fields": [
-            ("ISSUE_NUMBER",    "Issue Number",        "text",     ""),
-            ("ISSUE_DATE",      "Issue Date",          "text",     ""),
-            ("ISSUE_INTRO_LINE","Intro Banner Line",   "text",     "Three Santa Cruz spots worth knowing this week."),
+            ("ISSUE_NUMBER",    "Issue Number",      "text",     ""),
+            ("ISSUE_DATE",      "Issue Date",        "text",     ""),
+            ("ISSUE_INTRO_LINE","Intro Banner Line", "text",     "Three Santa Cruz spots worth knowing this week."),
         ]
     },
     "biz1": {
@@ -120,348 +137,285 @@ TEMPLATE_FIELDS = {
     "meta": {
         "label": "Footer & Links",
         "fields": [
-            ("REPLY_EMAIL",      "Reply-To Email",        "email", os.getenv("REPLY_EMAIL", "")),
-            ("FORWARD_URL",      "Forward URL",           "url",   ""),
-            ("SIGNUP_URL",       "Sign-Up URL",           "url",   ""),
-            ("COMPANY_ADDRESS",  "Company Street Address","text",  ""),
-            ("PREFERENCES_URL",  "Preferences URL",       "url",   "#"),
-            ("UNSUBSCRIBE_URL",  "Unsubscribe URL",       "url",   "#"),
+            ("REPLY_EMAIL",     "Reply-To Email",         "email", os.getenv("REPLY_EMAIL", "")),
+            ("FORWARD_URL",     "Forward URL",            "url",   ""),
+            ("SIGNUP_URL",      "Sign-Up URL",            "url",   ""),
+            ("COMPANY_ADDRESS", "Company Street Address", "text",  ""),
+            ("PREFERENCES_URL", "Preferences URL",        "url",   "#"),
+            ("UNSUBSCRIBE_URL", "Unsubscribe URL",        "url",   "#"),
         ]
     },
 }
 
-# Fields that contain URLs we want to track clicks on
-TRACKED_URL_FIELDS = {
-    "BIZ_1_WEBSITE", "BIZ_2_WEBSITE", "BIZ_3_WEBSITE",
-    "FORWARD_URL", "SIGNUP_URL",
-}
+TRACKED_URL_FIELDS = {"BIZ_1_WEBSITE", "BIZ_2_WEBSITE", "BIZ_3_WEBSITE", "FORWARD_URL", "SIGNUP_URL"}
+
+ALL_KEYS = [key for section in TEMPLATE_FIELDS.values() for key, *_ in section["fields"]]
 
 
-# ── Template / link helpers ──────────────────────────────────────────────────
+# ── Email helpers ─────────────────────────────────────────────────────────────
 
-def make_tracking_url(original_url: str, issue_number: str, field_key: str) -> str:
-    """Wrap a URL in our click-tracking redirect.
-    Uses APP_URL env var (set this to your Railway public URL) so links in
-    sent emails point to the right host — not localhost.
-    """
+def make_tracking_url(original_url: str, issue_number: str, field_key: str, base: str) -> str:
     if not original_url or original_url in ("#", "https://"):
         return original_url
-    import urllib.parse
-    # APP_URL should be like https://your-app.up.railway.app (no trailing slash)
-    base = os.getenv("APP_URL", "").rstrip("/")
-    if not base:
-        # Fall back to the current request host when called inside a request context
-        try:
-            from flask import request as _req
-            base = _req.host_url.rstrip("/")
-        except RuntimeError:
-            base = "http://localhost:5050"
     params = urllib.parse.urlencode({"url": original_url, "issue": issue_number, "ref": field_key})
     return f"{base}/track?{params}"
 
-
-def fill_template(data: dict, track_links: bool = False) -> str:
-    """Replace all {{VARIABLE}} placeholders. Optionally wrap tracked URLs."""
+def fill_template(data: dict, track_links: bool = False, base_url: str = "") -> str:
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         html = f.read()
-
     issue_number = data.get("ISSUE_NUMBER", "")
-
     for key, value in data.items():
         val = value or ""
         if track_links and key in TRACKED_URL_FIELDS and val:
-            val = make_tracking_url(val, issue_number, key)
+            val = make_tracking_url(val, issue_number, key, base_url)
         html = html.replace("{{" + key + "}}", val)
     return html
 
-
 def send_email(html_body: str, subject: str, recipients: list) -> tuple:
-    """Send the rendered HTML email via SMTP."""
     smtp_host  = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port  = int(os.getenv("SMTP_PORT", 587))
     smtp_user  = os.getenv("SMTP_USER", "")
     smtp_pass  = os.getenv("SMTP_PASS", "")
     from_name  = os.getenv("FROM_NAME", "Santa Cruz Local Legends")
     from_email = os.getenv("FROM_EMAIL", smtp_user)
-
     if not smtp_user or not smtp_pass:
-        return False, "SMTP credentials are not configured. Go to Settings first."
-
+        return False, "SMTP credentials not configured. Go to Settings."
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = f"{from_name} <{from_email}>"
     msg["To"]      = ", ".join(recipients)
     msg.attach(MIMEText(html_body, "html", "utf-8"))
-
     try:
         with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
+            server.ehlo(); server.starttls(); server.login(smtp_user, smtp_pass)
             server.sendmail(from_email, recipients, msg.as_string())
         return True, f"Sent to {len(recipients)} recipient(s)."
     except Exception as e:
         return False, f"Send failed: {str(e)}"
 
+def today() -> str:
+    return datetime.now().strftime("%B %-d, %Y")
 
-# ── Routes ───────────────────────────────────────────────────────────────────
 
-@app.route("/", methods=["GET"])
-def index():
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
     db = load_data()
-    # Auto-populate issue number and today's date if draft is empty
     draft = db.get("draft", {})
     if not draft.get("ISSUE_NUMBER"):
         draft["ISSUE_NUMBER"] = str(db["issue_counter"])
     if not draft.get("ISSUE_DATE"):
-        draft["ISSUE_DATE"] = datetime.now().strftime("%B %-d, %Y")
-    return render_template(
-        "form.html",
-        sections=TEMPLATE_FIELDS,
-        draft=draft,
-        subscriber_count=len(db.get("subscribers", [])),
-        send_history=db.get("send_history", [])[-10:][::-1],  # last 10, newest first
-        issue_counter=db["issue_counter"],
-    )
+        draft["ISSUE_DATE"] = today()
+    return render(request, "form.html", {
+        "sections":         TEMPLATE_FIELDS,
+        "draft":            draft,
+        "subscriber_count": len(db.get("subscribers", [])),
+        "send_history":     db.get("send_history", [])[-10:][::-1],
+        "issue_counter":    db["issue_counter"],
+    })
 
 
-@app.route("/draft/save", methods=["POST"])
-def save_draft():
-    """Auto-save the current form state."""
+@app.post("/draft/save")
+async def save_draft(request: Request):
+    form = await request.form()
     db = load_data()
-    db["draft"] = {key: request.form.get(key, "")
-                   for section in TEMPLATE_FIELDS.values()
-                   for key, *_ in section["fields"]}
+    db["draft"] = {k: form.get(k, "") for k in ALL_KEYS}
     save_data(db)
-    return jsonify({"ok": True})
+    return JSONResponse({"ok": True})
 
 
-@app.route("/draft/clear", methods=["POST"])
-def clear_draft():
-    """Clear draft and advance issue counter for a fresh issue."""
+@app.post("/draft/clear")
+async def clear_draft(request: Request):
     db = load_data()
     db["issue_counter"] += 1
     db["draft"] = {}
     save_data(db)
-    return jsonify({"ok": True, "next_issue": db["issue_counter"]})
+    return JSONResponse({"ok": True, "next_issue": db["issue_counter"]})
 
 
-@app.route("/preview", methods=["POST"])
-def preview():
-    data = {key: request.form.get(key, "")
-            for section in TEMPLATE_FIELDS.values()
-            for key, *_ in section["fields"]}
-    html = fill_template(data, track_links=False)
-    return html
+@app.post("/preview", response_class=HTMLResponse)
+async def preview(request: Request):
+    form = await request.form()
+    data = {k: form.get(k, "") for k in ALL_KEYS}
+    return fill_template(data, track_links=False)
 
 
-@app.route("/send", methods=["POST"])
-def send():
-    db = load_data()
-    data = {key: request.form.get(key, "")
-            for section in TEMPLATE_FIELDS.values()
-            for key, *_ in section["fields"]}
+@app.post("/send")
+async def send(request: Request):
+    db   = load_data()
+    form = await request.form()
+    data = {k: form.get(k, "") for k in ALL_KEYS}
 
-    send_to = request.form.get("send_to", "list")   # "list" | "custom"
-    recipients_raw = request.form.get("recipients", "").strip()
-    subject = (request.form.get("email_subject", "").strip()
-               or f"Santa Cruz Local Legends — Issue #{data.get('ISSUE_NUMBER', '')}")
+    send_to        = form.get("send_to", "list")
+    recipients_raw = form.get("recipients", "").strip()
+    subject        = form.get("email_subject", "").strip() or \
+                     f"Santa Cruz Local Legends — Issue #{data.get('ISSUE_NUMBER', '')}"
 
     if send_to == "list":
         recipients = [s["email"] for s in db.get("subscribers", [])]
         if not recipients:
-            return jsonify({"ok": False, "message": "Subscriber list is empty. Add subscribers first, or switch to custom recipients."})
+            return JSONResponse({"ok": False, "message": "Subscriber list is empty."})
     else:
         if not recipients_raw:
-            return jsonify({"ok": False, "message": "Please enter at least one recipient email."})
+            return JSONResponse({"ok": False, "message": "Enter at least one recipient."})
         recipients = [e.strip() for e in re.split(r"[,\n]+", recipients_raw) if e.strip()]
 
-    # Render with link tracking enabled for real sends
-    html_body = fill_template(data, track_links=True)
+    base_url  = os.getenv("APP_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
+    html_body = fill_template(data, track_links=True, base_url=base_url)
     ok, message = send_email(html_body, subject, recipients)
 
     if ok:
-        # Record in history
         db["send_history"].append({
             "issue":      data.get("ISSUE_NUMBER", "?"),
             "date":       datetime.now().strftime("%b %-d, %Y at %-I:%M %p"),
             "subject":    subject,
             "recipients": len(recipients),
         })
-        # Advance issue counter for next time
         try:
-            next_num = int(data.get("ISSUE_NUMBER", db["issue_counter"])) + 1
+            db["issue_counter"] = int(data.get("ISSUE_NUMBER", db["issue_counter"])) + 1
         except ValueError:
-            next_num = db["issue_counter"] + 1
-        db["issue_counter"] = next_num
+            db["issue_counter"] += 1
         db["draft"] = {}
         save_data(db)
 
-    return jsonify({"ok": ok, "message": message})
+    return JSONResponse({"ok": ok, "message": message})
 
 
-# ── Link click tracking ───────────────────────────────────────────────────────
-
-@app.route("/track")
-def track():
-    """Log a click and redirect to the real URL."""
-    import urllib.parse
-    dest    = request.args.get("url", "/")
-    issue   = request.args.get("issue", "?")
-    ref     = request.args.get("ref", "?")
-
+@app.get("/track")
+async def track(request: Request, url: str = "/", issue: str = "?", ref: str = "?"):
     db = load_data()
-    clicks = db.setdefault("click_log", [])
-    clicks.append({
-        "issue": issue,
-        "ref":   ref,
-        "url":   dest,
-        "time":  datetime.now().isoformat(),
+    db.setdefault("click_log", []).append({
+        "issue": issue, "ref": ref, "url": url,
+        "time": datetime.now().isoformat(),
     })
     save_data(db)
-    return redirect(dest)
+    return RedirectResponse(url)
 
 
-# ── Subscriber management ─────────────────────────────────────────────────────
+# ── Subscribers ───────────────────────────────────────────────────────────────
 
-@app.route("/subscribers", methods=["GET"])
-def subscribers():
+@app.get("/subscribers", response_class=HTMLResponse)
+async def subscribers_page(request: Request):
     db = load_data()
-    return render_template("subscribers.html", subscribers=db.get("subscribers", []))
+    return render(request, "subscribers.html", {"subscribers": db.get("subscribers", [])})
 
 
-@app.route("/subscribers/add", methods=["POST"])
-def add_subscriber():
-    email = request.form.get("email", "").strip().lower()
-    name  = request.form.get("name", "").strip()
+@app.post("/subscribers/add")
+async def add_subscriber(request: Request):
+    form  = await request.form()
+    email = form.get("email", "").strip().lower()
+    name  = form.get("name", "").strip()
     if not email or "@" not in email:
-        flash("Please enter a valid email address.", "error")
-        return redirect(url_for("subscribers"))
+        flash(request, "Please enter a valid email address.", "error")
+        return RedirectResponse("/subscribers", status_code=303)
     db = load_data()
     if any(s["email"] == email for s in db["subscribers"]):
-        flash(f"{email} is already on the list.", "warning")
-        return redirect(url_for("subscribers"))
-    db["subscribers"].append({
-        "email": email,
-        "name":  name,
-        "added": datetime.now().strftime("%b %-d, %Y"),
-    })
+        flash(request, f"{email} is already on the list.", "warning")
+        return RedirectResponse("/subscribers", status_code=303)
+    db["subscribers"].append({"email": email, "name": name, "added": today()})
     save_data(db)
-    flash(f"Added {email}.", "success")
-    return redirect(url_for("subscribers"))
+    flash(request, f"Added {email}.", "success")
+    return RedirectResponse("/subscribers", status_code=303)
 
 
-@app.route("/subscribers/remove/<path:email>", methods=["POST"])
-def remove_subscriber(email):
+@app.post("/subscribers/remove/{email:path}")
+async def remove_subscriber(request: Request, email: str):
     db = load_data()
     db["subscribers"] = [s for s in db["subscribers"] if s["email"] != email]
     save_data(db)
-    flash(f"Removed {email}.", "success")
-    return redirect(url_for("subscribers"))
+    flash(request, f"Removed {email}.", "success")
+    return RedirectResponse("/subscribers", status_code=303)
 
 
-@app.route("/subscribers/import", methods=["POST"])
-def import_subscribers():
-    """Accept a CSV file with columns: email, name (name optional)."""
-    f = request.files.get("csv_file")
-    if not f:
-        flash("No file uploaded.", "error")
-        return redirect(url_for("subscribers"))
-    db = load_data()
+@app.post("/subscribers/import")
+async def import_subscribers(request: Request, csv_file: UploadFile = File(...)):
+    db       = load_data()
     existing = {s["email"] for s in db["subscribers"]}
-    reader = csv.DictReader(io.StringIO(f.read().decode("utf-8", errors="ignore")))
-    added = 0
+    content  = await csv_file.read()
+    reader   = csv.DictReader(io.StringIO(content.decode("utf-8", errors="ignore")))
+    added    = 0
     for row in reader:
         email = (row.get("email") or row.get("Email") or "").strip().lower()
         name  = (row.get("name")  or row.get("Name")  or "").strip()
         if email and "@" in email and email not in existing:
-            db["subscribers"].append({
-                "email": email,
-                "name":  name,
-                "added": datetime.now().strftime("%b %-d, %Y"),
-            })
+            db["subscribers"].append({"email": email, "name": name, "added": today()})
             existing.add(email)
             added += 1
     save_data(db)
-    flash(f"Imported {added} new subscriber(s).", "success")
-    return redirect(url_for("subscribers"))
+    flash(request, f"Imported {added} new subscriber(s).", "success")
+    return RedirectResponse("/subscribers", status_code=303)
 
 
-@app.route("/subscribers/export")
-def export_subscribers():
-    db = load_data()
+@app.get("/subscribers/export")
+async def export_subscribers():
+    db     = load_data()
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=["email", "name", "added"])
     writer.writeheader()
     writer.writerows(db.get("subscribers", []))
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=subscribers.csv"},
     )
 
 
-# ── Analytics ────────────────────────────────────────────────────────────────
+# ── Analytics ─────────────────────────────────────────────────────────────────
 
-@app.route("/analytics")
-def analytics():
-    db = load_data()
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics(request: Request):
+    db        = load_data()
     click_log = db.get("click_log", [])
-    # Group by issue
-    by_issue = {}
+    by_issue  = {}
     for c in click_log:
-        key = c["issue"]
-        by_issue.setdefault(key, []).append(c)
-    return render_template(
-        "analytics.html",
-        by_issue=by_issue,
-        total_clicks=len(click_log),
-        send_history=db.get("send_history", [])[::-1],
-    )
+        by_issue.setdefault(c["issue"], []).append(c)
+    return render(request, "analytics.html", {
+        "by_issue":     by_issue,
+        "total_clicks": len(click_log),
+        "send_history": db.get("send_history", [])[::-1],
+    })
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 
-@app.route("/settings", methods=["GET", "POST"])
-def settings():
-    env_path = os.path.join(BASE_DIR, ".env")
-    env_vars = [
-        ("SMTP_HOST",   "SMTP Host",                    "text",     "smtp.gmail.com"),
-        ("SMTP_PORT",   "SMTP Port",                    "number",   "587"),
-        ("SMTP_USER",   "SMTP Username / Email",         "email",    ""),
-        ("SMTP_PASS",   "SMTP Password / App Password", "password", ""),
-        ("FROM_NAME",   "From Name",                    "text",     "Santa Cruz Local Legends"),
-        ("FROM_EMAIL",  "From Email",                   "email",    ""),
-        ("REPLY_EMAIL", "Default Reply-To Email",       "email",    ""),
-        ("SECRET_KEY",  "Flask Secret Key",             "text",     ""),
-    ]
-    if request.method == "POST":
-        lines = []
-        for var, *_ in env_vars:
-            val = request.form.get(var, "").strip()
-            if val:
-                lines.append(f'{var}="{val}"')
-        # Try writing .env (works locally). On Railway the filesystem may be
-        # read-only for the project root — in that case silently skip the write
-        # and instruct the user to set vars in the Railway dashboard instead.
-        try:
-            os.makedirs(os.path.dirname(env_path), exist_ok=True)
-            with open(env_path, "w") as f:
-                f.write("\n".join(lines) + "\n")
-            load_dotenv(override=True)
-            flash("Settings saved to .env!", "success")
-        except OSError:
-            flash(
-                "Could not write .env (read-only filesystem). "
-                "Set these variables in your Railway dashboard under Variables instead.",
-                "warning",
-            )
-        return redirect(url_for("settings"))
-    current = {var: os.getenv(var, default) for var, _, __, default in env_vars}
-    return render_template("settings.html", env_vars=env_vars, current=current)
+ENV_VARS = [
+    ("SMTP_HOST",   "SMTP Host",                    "text",     "smtp.gmail.com"),
+    ("SMTP_PORT",   "SMTP Port",                    "number",   "587"),
+    ("SMTP_USER",   "SMTP Username / Email",         "email",    ""),
+    ("SMTP_PASS",   "SMTP Password / App Password", "password", ""),
+    ("FROM_NAME",   "From Name",                    "text",     "Santa Cruz Local Legends"),
+    ("FROM_EMAIL",  "From Email",                   "email",    ""),
+    ("REPLY_EMAIL", "Default Reply-To Email",       "email",    ""),
+    ("SECRET_KEY",  "Flask Secret Key",             "text",     ""),
+]
 
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_get(request: Request):
+    current = {var: os.getenv(var, default) for var, _, __, default in ENV_VARS}
+    return render(request, "settings.html", {"env_vars": ENV_VARS, "current": current})
+
+@app.post("/settings")
+async def settings_post(request: Request):
+    form     = await request.form()
+    env_path = os.path.join(BASE_DIR, ".env")
+    lines    = []
+    for var, *_ in ENV_VARS:
+        val = form.get(var, "").strip()
+        if val:
+            lines.append(f'{var}="{val}"')
+    try:
+        with open(env_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        load_dotenv(env_path, override=True)
+        flash(request, "Settings saved to .env!", "success")
+    except OSError:
+        flash(request, "Could not write .env — set these as Railway Variables instead.", "warning")
+    return RedirectResponse("/settings", status_code=303)
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
-    # Never use the reloader — it spawns a child process Railway can't route to
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
