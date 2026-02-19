@@ -16,11 +16,21 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
 
+import traceback
+
 load_dotenv()
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "scll-secret-2024"))
 templates = Jinja2Templates(directory="templates")
+
+@app.exception_handler(Exception)
+async def debug_exception_handler(request: Request, exc: Exception):
+    return HTMLResponse(
+        f"<pre style='background:#1a1a1a;color:#f55;padding:40px;font-size:13px;'>"
+        f"ERROR: {type(exc).__name__}: {exc}\n\n{traceback.format_exc()}</pre>",
+        status_code=500,
+    )
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = os.path.join(BASE_DIR, "email_template.html")
